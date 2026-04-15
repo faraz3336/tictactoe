@@ -1,59 +1,36 @@
 #!/bin/sh
-set -eux
+set -e
 
-# ---- EXTRA DEBUG (ENV CHECK) ----
-echo "==== ENTRYPOINT STARTED ===="
+echo "🚀 Starting Nakama on Render..."
 
-echo "ALL ENV CHECK (DATABASE_URL):"
-printenv DATABASE_URL || echo "DATABASE_URL NOT FOUND"
-
-printenv | sort | grep NAKAMA || true
-
-# ---- DEBUG START ----
-echo "==== ENTRYPOINT STARTED ===="
-
-echo "DATABASE_URL=$DATABASE_URL"
-
-# Fail fast if DB is missing
+# Step 1: validate env
 if [ -z "$DATABASE_URL" ]; then
-  echo "ERROR: DATABASE_URL is EMPTY"
+  echo "❌ DATABASE_URL missing"
   exit 1
 fi
 
-# Use Render DB directly
-DB_ADDR="$DATABASE_URL"
-
-# Ensure sslmode (safe append)
-case "$DB_ADDR" in
-  *sslmode=*) ;;
-  *)
-    if echo "$DB_ADDR" | grep -q "?"; then
-      DB_ADDR="${DB_ADDR}&sslmode=require"
-    else
-      DB_ADDR="${DB_ADDR}?sslmode=require"
-    fi
-    ;;
-esac
-
+# Step 2: fix DB URL
+DB_ADDR=$(echo "$DATABASE_URL" | sed -E 's|^postgres(ql)?://||')
 export NAKAMA_DATABASE_ADDRESS="$DB_ADDR"
 
-echo "FINAL DB: $NAKAMA_DATABASE_ADDRESS"
+echo "✅ DB parsed successfully"
 
-# ---- MIGRATIONS ----
-echo "Running migrations..."
-/nakama/nakama migrate up --database.address "$NAKAMA_DATABASE_ADDRESS"
+# Step 3: run migrations
+echo "🚧 Running migrations..."
+/nakama/nakama migrate up --database.address "$DB_ADDR"
 
-# ---- START SERVER ----
-echo "Starting Nakama..."
+echo "✅ Migrations complete"
+
+# Step 4: start server (THIS keeps container alive)
+echo "🚀 Starting Nakama server..."
+
 exec /nakama/nakama \
-  --name nakama \
-  --database.address "$NAKAMA_DATABASE_ADDRESS" \
-  --logger.level DEBUG \
-  --session.token_expiry_sec 7200 \
-  --socket.server_key "${NAKAMA_SERVER_KEY}" \
-  --console.username "${NAKAMA_CONSOLE_USER}" \
-  --console.password "${NAKAMA_CONSOLE_PASS}" \
-  --session.encryption_key "${NAKAMA_SESSION_KEY}" \
-  --session.refresh_encryption_key "${NAKAMA_REFRESH_KEY}" \
-  --runtime.http_key "${NAKAMA_HTTP_KEY}" \
-  --socket.port 7350
+  --database.address "$DB_ADDR" \
+  --logger.level INFO \
+  --socket.server_key "$NAKAMA_SERVER_KEY" \
+  --console.username "$NAKAMA_CONSOLE_USER" \
+  --console.password "$NAKAMA_CONSOLE_PASS" \
+  --session.encryption_key "$NAKAMA_SESSION_KEY" \
+  --session.refresh_encryption_key "$NAKAMA_REFRESH_KEY" \
+  --runtime.http_key "$NAKAMA_HTTP_KEY" \
+  --socket.port "${PORT:-7350}"

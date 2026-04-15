@@ -3,10 +3,47 @@ FROM heroiclabs/nakama:3.20.0
 COPY backend/data/modules /nakama/data/modules
 
 USER root
-RUN printf '#!/bin/sh\nset -ex\n\necho "Starting Nakama..."\n\nif [ -z "$DATABASE_URL" ]; then\n  echo "ERROR: DATABASE_URL not set"\n  exit 1\nfi\n\nDB_ADDR=$(echo "$DATABASE_URL" | sed -E '"'"'s|^postgres(ql)?://||'"'"')\necho "DB: $DB_ADDR"\n\nMAX=30\nN=0\nuntil /nakama/nakama migrate up --database.address "$DB_ADDR"; do\n  N=$((N+1))\n  [ $N -ge $MAX ] && echo "DB never ready" && exit 1\n  echo "Retry $N/$MAX in 5s..."\n  sleep 5\ndone\n\necho "Migrations done. Starting on ${PORT:-7350}..."\n\nexec /nakama/nakama \\\n  --database.address "$DB_ADDR" \\\n  --logger.level INFO \\\n  --socket.port "${PORT:-7350}" \\\n  --socket.address "0.0.0.0" \\\n  --session.encryption_key "${NAKAMA_SESSION_KEY}" \\\n  --session.refresh_encryption_key "${NAKAMA_REFRESH_KEY}" \\\n  --runtime.http_key "${NAKAMA_HTTP_KEY}" \\\n  --console.username "${NAKAMA_CONSOLE_USER:-admin}" \\\n  --console.password "${NAKAMA_CONSOLE_PASS}"\n' > /nakama/entrypoint.sh \
-  && chmod 755 /nakama/entrypoint.sh \
-  && chown nakama:nakama /nakama/entrypoint.sh
+
+RUN printf '#!/bin/sh
+set -ex
+
+echo "Starting Nakama..."
+
+if [ -z "$DATABASE_URL" ]; then
+echo "ERROR: DATABASE_URL not set"
+exit 1
+fi
+
+DB_ADDR=$(echo "$DATABASE_URL" | sed -E '\''s|^postgres(ql)?://||'\'')
+
+echo "DB: $DB_ADDR"
+
+MAX=30
+N=0
+
+until /nakama/nakama migrate up --database.address "$DB_ADDR"; do
+N=$((N+1))
+[ $N -ge $MAX ] && echo "DB never ready" && exit 1
+echo "Retry $N/$MAX in 5s..."
+sleep 5
+done
+
+echo "Migrations done. Starting..."
+
+exec /nakama/nakama \
+  --database.address "$DB_ADDR" \
+  --logger.level INFO \
+  --socket.port "${PORT:-7350}" \
+  --socket.address "0.0.0.0" \
+  --session.encryption_key "${NAKAMA_SESSION_KEY}" \
+  --session.refresh_encryption_key "${NAKAMA_REFRESH_KEY}" \
+  --runtime.http_key "${NAKAMA_HTTP_KEY}" \
+  --console.username "${NAKAMA_CONSOLE_USER:-admin}" \
+  --console.password "${NAKAMA_CONSOLE_PASS}"
+' > /nakama/entrypoint.sh \
+  && chmod +x /nakama/entrypoint.sh
 
 USER nakama
+
 EXPOSE 7350
 ENTRYPOINT ["/nakama/entrypoint.sh"]

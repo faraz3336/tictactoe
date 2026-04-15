@@ -9,34 +9,41 @@ if [ -z "$DATABASE_URL" ]; then
   exit 1
 fi
 
-# Strip postgres:// or postgresql:// prefix and query params
+# Strip postgres:// or postgresql:// prefix AND query params
+# SSL is handled separately via --database.dsn flag
 DB_ADDR=$(echo "$DATABASE_URL" \
   | sed -E 's|^postgres(ql)?://||' \
   | sed 's|\?.*||')
 
-export NAKAMA_DATABASE_ADDRESS="$DB_ADDR"
 echo "📦 DB address: $DB_ADDR"
 
-# Wait for DB to accept connections (critical on Render free tier)
-echo "⏳ Waiting for database to be ready..."
-MAX_RETRIES=20
+# Wait for DB + run migrations (retry loop for Render free tier cold starts)
+echo "⏳ Running migrations (will retry until DB is ready)..."
+MAX_RETRIES=30
 RETRY=0
-until /nakama/nakama migrate up --database.address "$DB_ADDR"; do
+until /nakama/nakama migrate up \
+    --database.address "$DB_ADDR" \
+    --database.dsn "sslmode=require"; do
   RETRY=$((RETRY + 1))
   if [ "$RETRY" -ge "$MAX_RETRIES" ]; then
-    echo "❌ Database never became ready after $MAX_RETRIES attempts. Exiting."
+    echo "❌ DB never became ready after $MAX_RETRIES attempts. Giving up."
     exit 1
   fi
-  echo "⚠️  DB not ready (attempt $RETRY/$MAX_RETRIES), retrying in 5s..."
+  echo "⚠️  Attempt $RETRY/$MAX_RETRIES failed, retrying in 5s..."
   sleep 5
 done
 
 echo "✅ Migrations complete"
-
-echo "🎮 Starting Nakama server on port ${PORT:-7350}..."
+echo "🎮 Starting server on port ${PORT:-7350}..."
 
 exec /nakama/nakama \
   --database.address "$DB_ADDR" \
+  --database.dsn "sslmode=require" \
   --logger.level INFO \
   --socket.port "${PORT:-7350}" \
-  --socket.address "0.0.0.0"
+  --socket.address "0.0.0.0" \
+  --session.encryption_key "${NAKAMA_SESSION_KEY}" \
+  --session.refresh_encryption_key "${NAKAMA_REFRESH_KEY}" \
+  --runtime.http_key "${NAKAMA_HTTP_KEY}" \
+  --console.username "${NAKAMA_CONSOLE_USER:-admin}" \
+  --console.password "${NAKAMA_CONSOLE_PASS}"

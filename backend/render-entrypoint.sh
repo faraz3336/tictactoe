@@ -1,23 +1,21 @@
 #!/bin/sh
 set -e
 
-# Use DATABASE_URL directly (Render already provides correct format)
-DB_ADDR="$DATABASE_URL"
+echo "DATABASE_URL is: $DATABASE_URL"
 
+DB_ADDR="$DATABASE_URL"
 export NAKAMA_DATABASE_ADDRESS="$DB_ADDR"
 
 echo "Using Database Address: $NAKAMA_DATABASE_ADDRESS"
 
-# Run migrations
 echo "Running Nakama database migrations..."
-/nakama/nakama migrate up --database.address "$NAKAMA_DATABASE_ADDRESS"
+/nakama/nakama migrate up --database.address "$NAKAMA_DATABASE_ADDRESS" || echo "Migration failed"
 
-# Start Nakama
 echo "Starting Nakama server..."
 exec /nakama/nakama \
   --name nakama \
   --database.address "$NAKAMA_DATABASE_ADDRESS" \
-  --logger.level INFO \
+  --logger.level DEBUG \
   --session.token_expiry_sec 7200 \
   --socket.server_key "${NAKAMA_SERVER_KEY}" \
   --console.username "${NAKAMA_CONSOLE_USER}" \

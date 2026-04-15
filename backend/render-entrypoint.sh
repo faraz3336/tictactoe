@@ -1,5 +1,13 @@
 #!/bin/sh
-set -e
+set -eux
+
+# ---- EXTRA DEBUG (ENV CHECK) ----
+echo "==== ENTRYPOINT STARTED ===="
+
+echo "ALL ENV CHECK (DATABASE_URL):"
+printenv DATABASE_URL || echo "DATABASE_URL NOT FOUND"
+
+printenv | sort | grep NAKAMA || true
 
 # ---- DEBUG START ----
 echo "==== ENTRYPOINT STARTED ===="

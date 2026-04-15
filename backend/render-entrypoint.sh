@@ -8,33 +8,30 @@ if [ -z "$DATABASE_URL" ]; then
   exit 1
 fi
 
-DB_ADDR=$(echo "$DATABASE_URL" \
-  | sed -E 's|^postgres(ql)?://||' \
-  | sed 's|\?.*||')
+# Strip scheme, keep user:pass@host:port/db, re-append sslmode
+# Input:  postgres://user:pass@host:5432/db?sslmode=require
+# Output: user:pass@host:5432/db?sslmode=require
+DB_ADDR=$(echo "$DATABASE_URL" | sed -E 's|^postgres(ql)?://||')
 
-echo "DB address: $DB_ADDR"
+echo "DB_ADDR: $DB_ADDR"
 
 echo "Running migrations..."
 MAX_RETRIES=30
 RETRY=0
-until /nakama/nakama migrate up \
-    --database.address "$DB_ADDR" \
-    --database.dsn "sslmode=require"; do
+until /nakama/nakama migrate up --database.address "$DB_ADDR"; do
   RETRY=$((RETRY + 1))
   if [ "$RETRY" -ge "$MAX_RETRIES" ]; then
-    echo "DB never became ready after $MAX_RETRIES attempts. Exiting."
+    echo "ERROR: DB never became ready after $MAX_RETRIES attempts."
     exit 1
   fi
   echo "Attempt $RETRY/$MAX_RETRIES failed, retrying in 5s..."
   sleep 5
 done
 
-echo "Migrations complete"
-echo "Starting server on port ${PORT:-7350}..."
+echo "Migrations complete. Starting server on port ${PORT:-7350}..."
 
 exec /nakama/nakama \
   --database.address "$DB_ADDR" \
-  --database.dsn "sslmode=require" \
   --logger.level INFO \
   --socket.port "${PORT:-7350}" \
   --socket.address "0.0.0.0" \

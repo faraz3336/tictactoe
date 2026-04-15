@@ -1,36 +1,42 @@
 #!/bin/sh
-set -e
+set -ex
 
-echo "🚀 Starting Nakama on Render..."
+echo "🚀 Starting Nakama..."
 
-# Step 1: validate env
+# Validate DATABASE_URL is set
 if [ -z "$DATABASE_URL" ]; then
-  echo "❌ DATABASE_URL missing"
+  echo "❌ ERROR: DATABASE_URL is not set!"
   exit 1
 fi
 
-# Step 2: fix DB URL
-DB_ADDR=$(echo "$DATABASE_URL" | sed -E 's|^postgres://||' | sed 's|\?sslmode=require||')
+# Strip postgres:// or postgresql:// prefix and query params
+DB_ADDR=$(echo "$DATABASE_URL" \
+  | sed -E 's|^postgres(ql)?://||' \
+  | sed 's|\?.*||')
+
 export NAKAMA_DATABASE_ADDRESS="$DB_ADDR"
+echo "📦 DB address: $DB_ADDR"
 
-echo "✅ DB parsed successfully"
-
-# Step 3: run migrations
-echo "🚧 Running migrations..."
-/nakama/nakama migrate up --database.address "$DB_ADDR"
+# Wait for DB to accept connections (critical on Render free tier)
+echo "⏳ Waiting for database to be ready..."
+MAX_RETRIES=20
+RETRY=0
+until /nakama/nakama migrate up --database.address "$DB_ADDR"; do
+  RETRY=$((RETRY + 1))
+  if [ "$RETRY" -ge "$MAX_RETRIES" ]; then
+    echo "❌ Database never became ready after $MAX_RETRIES attempts. Exiting."
+    exit 1
+  fi
+  echo "⚠️  DB not ready (attempt $RETRY/$MAX_RETRIES), retrying in 5s..."
+  sleep 5
+done
 
 echo "✅ Migrations complete"
 
-# Step 4: start server (THIS keeps container alive)
-echo "🚀 Starting Nakama server..."
+echo "🎮 Starting Nakama server on port ${PORT:-7350}..."
 
 exec /nakama/nakama \
   --database.address "$DB_ADDR" \
   --logger.level INFO \
-  --socket.server_key "$NAKAMA_SERVER_KEY" \
-  --console.username "$NAKAMA_CONSOLE_USER" \
-  --console.password "$NAKAMA_CONSOLE_PASS" \
-  --session.encryption_key "$NAKAMA_SESSION_KEY" \
-  --session.refresh_encryption_key "$NAKAMA_REFRESH_KEY" \
-  --runtime.http_key "$NAKAMA_HTTP_KEY" \
-  --socket.port "${PORT:-7350}"
+  --socket.port "${PORT:-7350}" \
+  --socket.address "0.0.0.0"

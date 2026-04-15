@@ -4,7 +4,7 @@ COPY backend/data/modules /nakama/data/modules
 
 CMD /nakama/nakama \
   --name nakama \
-  --database.address "${DATABASE_URL}" \
+  --database.address "${DATABASE_ADDRESS}" \
   --logger.level INFO \
   --session.token_expiry_sec 7200 \
   --socket.server_key "${NAKAMA_SERVER_KEY}" \

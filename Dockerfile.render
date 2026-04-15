@@ -2,6 +2,8 @@ FROM heroiclabs/nakama:3.20.0
 
 COPY backend/data/modules /nakama/data/modules
 
+ENTRYPOINT ["/bin/sh", "-c"]
+
 CMD /nakama/nakama \
   --name nakama \
   --database.address "$DATABASE_URL" \

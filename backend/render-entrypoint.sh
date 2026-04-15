@@ -1,7 +1,9 @@
 #!/bin/sh
+
 set -eux
 
-echo "=== ENTRYPOINT STARTED ==="
+echo "==== ENTRYPOINT STARTED ===="
+
 echo "DATABASE_URL=$DATABASE_URL"
 
 if [ -z "$DATABASE_URL" ]; then
@@ -11,12 +13,15 @@ fi
 
 export NAKAMA_DATABASE_ADDRESS="$DATABASE_URL"
 
-echo "DB SET OK: $NAKAMA_DATABASE_ADDRESS"
+echo "DB OK: $NAKAMA_DATABASE_ADDRESS"
 
-echo "RUNNING MIGRATIONS"
-/nakama/nakama migrate up --database.address "$NAKAMA_DATABASE_ADDRESS"
+echo "RUN MIGRATIONS"
+/nakama/nakama migrate up --database.address "$NAKAMA_DATABASE_ADDRESS" || {
+  echo "MIGRATION FAILED"
+  exit 1
+}
 
-echo "STARTING NAKAMA"
+echo "START NAKAMA"
 exec /nakama/nakama \
   --database.address "$NAKAMA_DATABASE_ADDRESS" \
   --logger.level DEBUG \

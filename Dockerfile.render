@@ -1,0 +1,18 @@
+FROM heroiclabs/nakama:3.20.0
+
+# Copy Lua runtime modules into Nakama modules path.
+COPY backend/data/modules /nakama/data/modules
+
+# Use Render's PORT (usually 10000) for HTTP gateway.
+CMD ["/nakama/nakama", \
+    "--name", "nakama", \
+    "--database.address", "${DATABASE_URL}", \
+    "--logger.level", "INFO", \
+    "--session.token_expiry_sec", "7200", \
+    "--socket.server_key", "${NAKAMA_SERVER_KEY}", \
+    "--console.username", "${NAKAMA_CONSOLE_USER}", \
+    "--console.password", "${NAKAMA_CONSOLE_PASS}", \
+    "--session.encryption_key", "${NAKAMA_SESSION_KEY}", \
+    "--session.refresh_encryption_key", "${NAKAMA_REFRESH_KEY}", \
+    "--runtime.http_key", "${NAKAMA_HTTP_KEY}", \
+    "--socket.port", "7350"]

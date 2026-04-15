@@ -10,7 +10,7 @@ if [ -z "$DATABASE_URL" ]; then
 fi
 
 # Step 2: fix DB URL
-DB_ADDR=$(echo "$DATABASE_URL" | sed -E 's|^postgres(ql)?://||')
+DB_ADDR=$(echo "$DATABASE_URL" | sed -E 's|^postgres://||' | sed 's|\?sslmode=require||')
 export NAKAMA_DATABASE_ADDRESS="$DB_ADDR"
 
 echo "✅ DB parsed successfully"

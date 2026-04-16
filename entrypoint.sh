@@ -14,14 +14,12 @@ if [ -z "$NAKAMA_SESSION_KEY" ] || [ -z "$NAKAMA_REFRESH_KEY" ] || [ -z "$NAKAMA
   exit 1
 fi
 
-# Extract host:port from DATABASE_URL for migrate command
-DB_ADDR=$(echo "$DATABASE_URL" | sed -E 's|^postgres(ql)?://([^@]+@)?([^/:]+)(:[0-9]+)?/?.*$|\3\4|')
-echo "🗄️  Connecting to: $DB_ADDR"
+echo "🗄️  Connecting to database..."
 
-# Wait for DB readiness with retry
+# Wait for DB to be ready using FULL DATABASE_URL (no parsing!)
 MAX=30
 N=0
-until /nakama/nakama migrate up --database.address "$DB_ADDR" 2>/dev/null; do
+until /nakama/nakama migrate up --database.address "$DATABASE_URL" 2>&1 | grep -q "Migration complete\|error"; do
   N=$((N+1))
   [ $N -ge $MAX ] && echo "❌ Database never became ready" && exit 1
   echo "⏳ Retry $N/$MAX... waiting for DB"
@@ -30,7 +28,7 @@ done
 
 echo "✅ Migrations complete. Starting Nakama server..."
 
-# Start Nakama
+# Start Nakama with full DATABASE_URL
 exec /nakama/nakama \
   --database.address "$DATABASE_URL" \
   --logger.level INFO \

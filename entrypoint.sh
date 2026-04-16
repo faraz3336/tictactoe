@@ -1,34 +1,37 @@
 #!/bin/sh
-set -ex
+set -e
 
 echo "🚀 Starting Nakama..."
 
 # Validate required env vars
-if [ -z "$DATABASE_URL" ]; then
-  echo "❌ ERROR: DATABASE_URL not set"
-  exit 1
-fi
-
-if [ -z "$NAKAMA_SESSION_KEY" ] || [ -z "$NAKAMA_REFRESH_KEY" ] || [ -z "$NAKAMA_HTTP_KEY" ]; then
-  echo "❌ ERROR: Required encryption keys not set"
-  exit 1
-fi
+: "${DATABASE_URL:?❌ ERROR: DATABASE_URL not set}"
+: "${NAKAMA_SESSION_KEY:?❌ ERROR: NAKAMA_SESSION_KEY not set}"
+: "${NAKAMA_REFRESH_KEY:?❌ ERROR: NAKAMA_REFRESH_KEY not set}"
+: "${NAKAMA_HTTP_KEY:?❌ ERROR: NAKAMA_HTTP_KEY not set}"
 
 echo "🗄️  Connecting to database..."
 
-# Wait for DB to be ready using FULL DATABASE_URL (no parsing!)
+# Wait for DB with simple retry (check exit code directly)
 MAX=30
 N=0
-until /nakama/nakama migrate up --database.address "$DATABASE_URL" 2>&1 | grep -q "Migration complete\|error"; do
+while [ $N -lt $MAX ]; do
+  echo "⏳ Attempt $((N+1))/$MAX: Running migrations..."
+  
+  if /nakama/nakama migrate up --database.address "$DATABASE_URL" 2>&1; then
+    echo "✅ Migrations successful!"
+    break
+  fi
+  
   N=$((N+1))
-  [ $N -ge $MAX ] && echo "❌ Database never became ready" && exit 1
-  echo "⏳ Retry $N/$MAX... waiting for DB"
+  [ $N -ge $MAX ] && { echo "❌ Failed after $MAX attempts"; exit 1; }
+  
+  echo "⚠️  Migration failed, retrying in 5s..."
   sleep 5
 done
 
-echo "✅ Migrations complete. Starting Nakama server..."
+echo "🔌 Starting Nakama server on port ${PORT:-7350}..."
 
-# Start Nakama with full DATABASE_URL
+# Start Nakama server
 exec /nakama/nakama \
   --database.address "$DATABASE_URL" \
   --logger.level INFO \

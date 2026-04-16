@@ -1,47 +1,9 @@
-FROM heroiclabs/nakama:3.20.0
+FROM heroiclabs/nakama:2.39.0
 
-COPY backend/data/modules /nakama/data/modules
+# Copy entrypoint script (cleaner than inline printf)
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
-USER root
+EXPOSE 7350 7351
 
-RUN printf "%s\n" \
-  '#!/bin/sh' \
-  'set -ex' \
-  '' \
-  'echo "Starting Nakama..."' \
-  '' \
-  'if [ -z "$DATABASE_URL" ]; then' \
-  '  echo "ERROR: DATABASE_URL not set"' \
-  '  exit 1' \
-  'fi' \
-  '' \
-  'DB_ADDR=$(echo "$DATABASE_URL" | sed -E "s|^postgres(ql)?://||")' \
-  'echo "DB: $DB_ADDR"' \
-  '' \
-  'MAX=30' \
-  'N=0' \
-  'until /nakama/nakama migrate up --database.address "$DB_ADDR"; do' \
-  '  N=$((N+1))' \
-  '  [ $N -ge $MAX ] && echo "DB never ready" && exit 1' \
-  '  echo "Retry $N/$MAX..."' \
-  '  sleep 5' \
-  'done' \
-  '' \
-  'exec /nakama/nakama \' \
-  '  --database.address "$DB_ADDR" \' \
-  '  --logger.level INFO \' \
-  '  --socket.port "${PORT:-7350}" \' \
-  '  --socket.address "0.0.0.0" \' \
-  '  --session.encryption_key "${NAKAMA_SESSION_KEY}" \' \
-  '  --session.refresh_encryption_key "${NAKAMA_REFRESH_KEY}" \' \
-  '  --runtime.http_key "${NAKAMA_HTTP_KEY}" \' \
-  '  --console.username "${NAKAMA_CONSOLE_USER:-admin}" \' \
-  '  --console.password "${NAKAMA_CONSOLE_PASS}" \
-  > /tmp/start.sh \
-  && chmod +x /tmp/start.sh
-
-USER nakama
-
-EXPOSE 7350
-
-ENTRYPOINT ["/tmp/start.sh"]
+ENTRYPOINT ["/entrypoint.sh"]

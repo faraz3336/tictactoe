@@ -1,6 +1,10 @@
 # Dockerfile.render
 FROM heroiclabs/nakama:3.36.0
 
+# Copy Lua modules FIRST (so they're in the right place)
+COPY backend/data/modules /nakama/data/modules
+
+# Copy entrypoint script
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 

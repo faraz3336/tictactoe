@@ -1,9 +1,12 @@
-FROM heroiclabs/nakama:2.39.0
+# Dockerfile.render - Clean version for Render.com
+FROM heroiclabs/nakama:3.36.0
 
-# Copy entrypoint script (cleaner than inline printf)
+# Copy entrypoint script
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
+# Expose Nakama ports
 EXPOSE 7350 7351
 
+# Use entrypoint
 ENTRYPOINT ["/entrypoint.sh"]
